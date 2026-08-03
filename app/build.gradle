@@ -1,0 +1,41 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.google.android.youtube.tv'
+    compileSdk 35
+
+    def releaseKeystorePath = System.getenv('SIGNING_KEYSTORE_PATH')
+    def releaseKeystorePassword = System.getenv('SIGNING_KEYSTORE_PASSWORD')
+    def releaseKeyAlias = System.getenv('SIGNING_KEY_ALIAS')
+    def releaseKeyPassword = System.getenv('SIGNING_KEY_PASSWORD')
+
+    defaultConfig {
+        applicationId 'com.google.android.youtube.tv'
+        minSdk 21
+        targetSdk 35
+        versionCode = (System.getenv('VERSION_CODE') ?: '1').toInteger()
+        versionName = System.getenv('VERSION_NAME') ?: '1.0.0'
+    }
+
+    signingConfigs {
+        if (releaseKeystorePath) {
+            release {
+                storeFile file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            if (releaseKeystorePath) {
+                signingConfig signingConfigs.release
+            }
+            minifyEnabled false
+        }
+    }
+}
