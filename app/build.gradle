@@ -12,11 +12,26 @@ android {
     def releaseKeyPassword = System.getenv('SIGNING_KEY_PASSWORD')
 
     defaultConfig {
-        applicationId 'com.google.android.youtube.tv'
         minSdk 21
         targetSdk 35
         versionCode = (System.getenv('VERSION_CODE') ?: '1').toInteger()
         versionName = System.getenv('VERSION_NAME') ?: '1.0.0'
+    }
+
+    flavorDimensions = ['store']
+    productFlavors {
+        atv {
+            dimension 'store'
+            // Hijacks the Google TV / Android TV YouTube package identity.
+            applicationId 'com.google.android.youtube.tv'
+        }
+        firetv {
+            dimension 'store'
+            // Hijacks the Fire OS YouTube package identity so Alexa's
+            // "open YouTube" voice intents resolve to this bridge instead of
+            // the uninstalled Amazon-catalog YouTube app.
+            applicationId 'com.amazon.firetv.youtube'
+        }
     }
 
     signingConfigs {
