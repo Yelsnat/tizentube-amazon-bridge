@@ -34,14 +34,21 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v6
 
-      - name: Build debug APK
+      - name: Build debug APKs
         run: ./gradlew --no-daemon assembleDebug
 
-      - name: Upload debug APK
+      - name: Upload ATV debug APK
         uses: actions/upload-artifact@v6
         with:
-          name: tizentube-bridge-debug
-          path: app/build/outputs/apk/debug/app-debug.apk
+          name: tizentube-bridge-atv-debug
+          path: app/build/outputs/apk/atv/debug/app-atv-debug.apk
+          if-no-files-found: error
+
+      - name: Upload Fire TV debug APK
+        uses: actions/upload-artifact@v6
+        with:
+          name: tizentube-bridge-firetv-debug
+          path: app/build/outputs/apk/firetv/debug/app-firetv-debug.apk
           if-no-files-found: error
 
   release:
@@ -71,7 +78,7 @@ jobs:
           test -n "$SIGNING_KEYSTORE_BASE64"
           printf '%s' "$SIGNING_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/release.jks"
 
-      - name: Build signed release APK
+      - name: Build signed release APKs
         env:
           SIGNING_KEYSTORE_PATH: ${{ runner.temp }}/release.jks
           SIGNING_KEYSTORE_PASSWORD: ${{ secrets.SIGNING_KEYSTORE_PASSWORD }}
@@ -81,10 +88,12 @@ jobs:
           VERSION_CODE: ${{ github.run_number }}
         run: ./gradlew --no-daemon assembleRelease
 
-      - name: Prepare release asset
-        run: cp app/build/outputs/apk/release/app-release.apk tizentube-bridge.apk
+      - name: Prepare release assets
+        run: |
+          cp app/build/outputs/apk/atv/release/app-atv-release.apk tizentube-bridge-atv.apk
+          cp app/build/outputs/apk/firetv/release/app-firetv-release.apk tizentube-bridge-firetv.apk
 
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release create "${{ github.ref_name }}" tizentube-bridge.apk --generate-notes --verify-tag
+        run: gh release create "${{ github.ref_name }}" tizentube-bridge-atv.apk tizentube-bridge-firetv.apk --generate-notes --verify-tag

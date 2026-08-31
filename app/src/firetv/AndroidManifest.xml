@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Lets Alexa route voice media/search commands (e.g. "open YouTube")
+         to this bridge on Fire OS, matching the permission declared by the
+         real Amazon-catalog YouTube app. -->
+    <uses-permission android:name="com.amazon.permission.media.session.voicecommandcontrol" />
+
+</manifest>
