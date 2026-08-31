@@ -102,18 +102,20 @@ uninstalled, this app is not compatible with your device.
 
 ### Install with Downloader by AFTVnews
 
-1. Install **Downloader by AFTVnews** from the Google Play Store.
+1. Install **Downloader by AFTVnews** from the Google Play Store on your
+   Android TV, Google TV, or Fire TV device.
 2. Allow Downloader to install unknown apps (**Settings > Apps > Special app
    access > Install unknown apps > Downloader**).
-3. Open Downloader and enter this code:
+3. Open Downloader and enter the direct APK URL for your platform from the
+   [latest release](https://github.com/Yelsnat/tizentube-amazon-bridge/releases/latest)
+   (Downloader accepts a full URL, not just a numeric code):
 
-   ```text
-   8792210
-   ```
+   - Android TV / Google TV: `https://github.com/Yelsnat/tizentube-amazon-bridge/releases/latest/download/app-atv-debug.apk`
+   - Fire TV / Fire Stick: `https://github.com/Yelsnat/tizentube-amazon-bridge/releases/latest/download/app-firetv-debug.apk`
 
 4. Select **Go**, wait for the APK to download, then select **Install**.
 
-To update, enter the same code again and install over the existing app. Don't
+To update, enter the same URL again and install over the existing app. Don't
 uninstall the bridge before an update.
 
 If Android reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, a differently signed
