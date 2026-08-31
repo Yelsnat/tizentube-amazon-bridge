@@ -1,7 +1,9 @@
 package com.google.android.apps.youtube.tv.activity;
 
 import android.app.Activity;
+import android.app.SearchManager;
 import android.content.ActivityNotFoundException;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -11,6 +13,7 @@ import com.google.android.youtube.tv.R;
 
 public final class ShellActivity extends Activity {
     private static final String COBALT_PACKAGE = "io.gh.reisxd.tizentube.cobalt";
+    private static final String YOUTUBE_SEARCH_URL = "https://www.youtube.com/results?search_query=";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -26,45 +29,70 @@ public final class ShellActivity extends Activity {
     }
 
     private void forward(Intent incoming) {
-        Intent outgoing = createForwardIntent(incoming);
+        // Cobalt (the target app) only ever reads an incoming intent's data
+        // URI; it does not look at extras such as SearchManager.QUERY. Target
+        // its resolved component directly rather than just its package so
+        // the intent is delivered regardless of Cobalt's own manifest
+        // intent-filter declarations, which are not reliably matched.
+        ComponentName target = resolveCobaltComponent();
+        if (target == null) {
+            Toast.makeText(this, R.string.error_not_installed, Toast.LENGTH_LONG).show();
+            finish();
+            return;
+        }
 
+        Intent outgoing = createForwardIntent(incoming, target);
         try {
             startActivity(outgoing);
-        } catch (ActivityNotFoundException firstFailure) {
-            Intent launcher = getPackageManager().getLeanbackLaunchIntentForPackage(COBALT_PACKAGE);
-            if (launcher == null) {
-                launcher = getPackageManager().getLaunchIntentForPackage(COBALT_PACKAGE);
-            }
-
-            if (launcher == null) {
-                Toast.makeText(this, R.string.error_not_installed, Toast.LENGTH_LONG).show();
-            } else {
-                copyPayload(incoming, launcher);
-                try {
-                    startActivity(launcher);
-                } catch (ActivityNotFoundException ignored) {
-                    Toast.makeText(this, R.string.error_cannot_open, Toast.LENGTH_LONG).show();
-                }
-            }
+        } catch (ActivityNotFoundException ignored) {
+            Toast.makeText(this, R.string.error_cannot_open, Toast.LENGTH_LONG).show();
         } finally {
             finish();
         }
     }
 
-    private Intent createForwardIntent(Intent incoming) {
-        String action = incoming != null ? incoming.getAction() : null;
-        Uri data = incoming != null ? incoming.getData() : null;
+    private ComponentName resolveCobaltComponent() {
+        Intent launcher = getPackageManager().getLeanbackLaunchIntentForPackage(COBALT_PACKAGE);
+        if (launcher == null) {
+            launcher = getPackageManager().getLaunchIntentForPackage(COBALT_PACKAGE);
+        }
+        return launcher != null ? launcher.getComponent() : null;
+    }
 
-        Intent outgoing;
+    private Intent createForwardIntent(Intent incoming, ComponentName target) {
+        String action = incoming != null ? incoming.getAction() : null;
+        Uri data = resolveData(incoming);
+
+        Intent outgoing = new Intent(action != null ? action : Intent.ACTION_VIEW);
         if (data != null) {
-            outgoing = new Intent(action != null ? action : Intent.ACTION_VIEW, data);
-        } else {
-            outgoing = new Intent(action != null ? action : Intent.ACTION_MAIN);
+            outgoing.setData(data);
         }
 
-        outgoing.setPackage(COBALT_PACKAGE);
+        outgoing.setComponent(target);
         copyPayload(incoming, outgoing);
         return outgoing;
+    }
+
+    /**
+     * Returns the URI to forward to Cobalt: the incoming intent's own data if
+     * present, otherwise a YouTube search results URL built from a voice/text
+     * search query extra (e.g. from MEDIA_PLAY_FROM_SEARCH or SEARCH intents).
+     */
+    private Uri resolveData(Intent incoming) {
+        if (incoming == null) {
+            return null;
+        }
+
+        if (incoming.getData() != null) {
+            return incoming.getData();
+        }
+
+        String query = incoming.getStringExtra(SearchManager.QUERY);
+        if (query != null && !query.trim().isEmpty()) {
+            return Uri.parse(YOUTUBE_SEARCH_URL + Uri.encode(query));
+        }
+
+        return null;
     }
 
     private void copyPayload(Intent source, Intent target) {
