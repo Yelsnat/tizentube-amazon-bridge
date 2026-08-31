@@ -30,11 +30,13 @@ login, tracking, analytics, advertising, or network client.
 - Forwards video requests originating from Google TV home-screen cards when the
   launcher targets the YouTube package.
 - Accepts common Android TV media, search, voice-command, and Google search
-  intents and forwards their data and extras to Cobalt.
+  intents, including Alexa voice search on Fire TV, and converts their search
+  query into a YouTube search URL that Cobalt understands.
 - Preserves URI permission flags, MIME type, clip data, and extras where
   possible.
-- Falls back to Cobalt's main TV activity if Cobalt does not expose an activity
-  for the incoming deep link.
+- Delivers intents directly to Cobalt's resolved Leanback/main activity
+  component, so forwarding does not depend on Cobalt's own manifest
+  declaring matching intent-filters.
 - Shows an English error message if Cobalt is missing or cannot be opened.
 - Keeps regular user-facing bridge labels transparent by referring to YouTube.
   Error messages name TizenTube Cobalt so missing dependencies can be diagnosed
@@ -95,15 +97,28 @@ official GitHub release URL.
 
 ## How it works
 
-1. Android sees this app as `com.google.android.youtube.tv`.
+1. Android sees this app as `com.google.android.youtube.tv` (or
+   `com.amazon.firetv.youtube` on Fire TV).
 2. A launcher, remote button, voice action, recommendation card, or another app
    sends an intent to the YouTube package.
-3. `ShellActivity` receives the intent and creates an equivalent intent limited
-   to `io.gh.reisxd.tizentube.cobalt`.
-4. The original URI, extras, clip data, MIME type, and relevant flags are copied.
-5. If Cobalt accepts that intent, Android opens the requested page or video.
-6. If no Cobalt component accepts it, the bridge opens Cobalt's Leanback/main
-   launcher activity instead.
+3. `ShellActivity` resolves Cobalt's own Leanback/main launcher activity
+   component (`io.gh.reisxd.tizentube.cobalt`) and forwards the intent
+   directly to that component, rather than only scoping the intent to
+   Cobalt's package. This is deliberate: Cobalt is a
+   [Cobalt](https://cobalt.dev)-based app whose Android glue code
+   (`CobaltActivity`) only ever reads the forwarded intent's **data URI** —
+   it ignores extras entirely — and, separately, targeting an explicit
+   component bypasses any gaps in Cobalt's own manifest `<intent-filter>`
+   declarations.
+4. If the incoming intent already carries a URI (a YouTube link, `youtube:`/
+   `vnd.youtube:` scheme, etc.), that URI is forwarded as-is.
+5. If the incoming intent instead carries a search query extra (e.g. Alexa's
+   or Android TV's `MEDIA_PLAY_FROM_SEARCH`/`SEARCH` voice intents, which have
+   no URI), the bridge builds a
+   `https://www.youtube.com/results?search_query=<query>` URL from the query
+   and forwards that instead, since Cobalt cannot read the raw query extra.
+6. The original extras, clip data, MIME type, and relevant flags are still
+   copied alongside the URI for forward compatibility.
 
 On supported Google TV launchers, Google may supply concrete YouTube search
 results from its own servers because the YouTube package ID is installed. Those
