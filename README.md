@@ -18,8 +18,9 @@ It's built as two flavors from the same codebase:
 - Opens TizenTube Cobalt when the YouTube tile, a remote's YouTube button, a
   YouTube link, or a voice command (including Alexa on Fire TV) is used.
 - Forwards YouTube website links and `youtube:`/`vnd.youtube:` URI schemes.
-- Converts voice/text search queries into a YouTube search URL, since Cobalt
-  only understands URIs, not raw search extras.
+- Converts voice/text search queries and `youtube://search?query=...`-style
+  deep links into a real `youtube.com` search URL, since Cobalt can only
+  navigate to actual `http(s)` web addresses.
 - Delivers intents directly to Cobalt's resolved launcher component, which
   doesn't depend on Cobalt's own manifest declaring matching intent-filters.
 - Shows a Toast naming TizenTube Cobalt if it's missing or can't be opened.
@@ -37,14 +38,22 @@ package instead, plus the `com.amazon.permission.media.session.voicecommandcontr
 permission the real Amazon YouTube app uses for Alexa media/voice control.
 Both flavors share the same `ShellActivity` forwarding logic unchanged.
 
-**Voice search initially didn't work** because Alexa's (and Android TV's)
-voice-search intents carry the spoken query as an Intent extra
-(`SearchManager.QUERY`), not a URI. Cobalt's Android glue code
+**Voice search initially didn't work.** Cobalt's Android glue code
 (`CobaltActivity`, from the [Cobalt](https://cobalt.dev) runtime it's built
-on) only ever reads an intent's data URI and ignores extras entirely, so the
-query was silently dropped and Cobalt just opened its home screen. This is
-fixed by converting the query into a `youtube.com/results?search_query=`
-URL before forwarding, and by targeting Cobalt's launcher component directly
+on) navigates directly to the forwarded intent's data as if it were a literal
+web page address — it never reads Intent extras. Alexa's Fire TV voice search
+sends a custom, non-`http(s)` deep link for this
+(`youtube://search?query=cat+videos&isVoice=true`), which isn't a navigable
+web address, so Cobalt's browser silently failed to load it and fell back to
+its default page — confirmed by device logs showing the deep link correctly
+reaching Cobalt's native layer but never resulting in an actual page
+navigation, on both cold and warm app starts.
+
+The fix: `ShellActivity` now recognizes `youtube:`/`vnd.youtube:` search deep
+links (and Android TV's standard `SearchManager.QUERY` search-intent extra)
+and translates the query into a real `https://www.youtube.com/results?search_query=`
+URL before forwarding, since that's the only kind of address Cobalt can
+actually load. It also targets Cobalt's launcher component directly
 (bypassing intent-filter matching) to work around a
 [known Cobalt manifest bug](https://github.com/reisxd/TizenTubeCobalt/issues/129).
 
@@ -68,9 +77,10 @@ URL before forwarding, and by targeting Cobalt's launcher component directly
    that package.
 3. `ShellActivity` resolves Cobalt's launcher activity component and forwards
    the intent to it directly.
-4. If the intent already carries a URI, that URI is forwarded as-is. If it
-   instead carries a search query extra, the bridge builds a YouTube search
-   URL from it.
+4. If the intent's URI is a search deep link (`youtube://search?query=...`)
+   or the intent carries a search query extra instead of a URI, the bridge
+   builds a real YouTube search URL from the query. Any other URI is
+   forwarded as-is.
 5. Extras, clip data, MIME type, and relevant flags are copied alongside the
    URI for compatibility with anything Cobalt may read.
 
