@@ -7,11 +7,13 @@ import android.content.ComponentName;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
+import android.util.Log;
 import android.widget.Toast;
 
 import com.google.android.youtube.tv.R;
 
 public final class ShellActivity extends Activity {
+    private static final String TAG = "TizenTubeBridge";
     private static final String COBALT_PACKAGE = "io.gh.reisxd.tizentube.cobalt";
     private static final String YOUTUBE_SEARCH_URL = "https://www.youtube.com/results?search_query=";
 
@@ -29,6 +31,8 @@ public final class ShellActivity extends Activity {
     }
 
     private void forward(Intent incoming) {
+        logIncoming(incoming);
+
         // Cobalt (the target app) only ever reads an incoming intent's data
         // URI; it does not look at extras such as SearchManager.QUERY. Target
         // its resolved component directly rather than just its package so
@@ -36,18 +40,54 @@ public final class ShellActivity extends Activity {
         // intent-filter declarations, which are not reliably matched.
         ComponentName target = resolveCobaltComponent();
         if (target == null) {
+            Log.w(TAG, "Cobalt is not installed / has no launcher activity");
             Toast.makeText(this, R.string.error_not_installed, Toast.LENGTH_LONG).show();
             finish();
             return;
         }
 
         Intent outgoing = createForwardIntent(incoming, target);
+        Log.d(TAG, "Forwarding to " + target.flattenToShortString()
+                + " action=" + outgoing.getAction() + " data=" + outgoing.getData());
         try {
             startActivity(outgoing);
-        } catch (ActivityNotFoundException ignored) {
+        } catch (ActivityNotFoundException e) {
+            Log.e(TAG, "Failed to start forwarded intent", e);
             Toast.makeText(this, R.string.error_cannot_open, Toast.LENGTH_LONG).show();
         } finally {
             finish();
+        }
+    }
+
+    /**
+     * Temporary diagnostic logging (view with `adb logcat -s TizenTubeBridge`)
+     * to see exactly what action/data/extras voice assistants send, since
+     * this varies by platform and is not always documented.
+     */
+    private void logIncoming(Intent incoming) {
+        if (incoming == null) {
+            Log.d(TAG, "Incoming intent is null");
+            return;
+        }
+
+        Log.d(TAG, "Incoming action=" + incoming.getAction()
+                + " data=" + incoming.getData()
+                + " type=" + incoming.getType()
+                + " categories=" + incoming.getCategories());
+
+        Bundle extras = incoming.getExtras();
+        if (extras == null || extras.isEmpty()) {
+            Log.d(TAG, "Incoming extras: none");
+            return;
+        }
+        for (String key : extras.keySet()) {
+            Object value;
+            try {
+                value = extras.get(key);
+            } catch (RuntimeException e) {
+                value = "<unreadable: " + e + ">";
+            }
+            Log.d(TAG, "Incoming extra: " + key + " = " + value);
         }
     }
 
