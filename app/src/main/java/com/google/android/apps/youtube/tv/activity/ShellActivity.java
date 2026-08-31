@@ -47,7 +47,7 @@ public final class ShellActivity extends Activity {
         }
 
         Intent outgoing = createForwardIntent(incoming, target);
-        Log.d(TAG, "Forwarding to " + target.flattenToShortString()
+        Log.i(TAG, "Forwarding to " + target.flattenToShortString()
                 + " action=" + outgoing.getAction() + " data=" + outgoing.getData());
         try {
             startActivity(outgoing);
@@ -66,18 +66,18 @@ public final class ShellActivity extends Activity {
      */
     private void logIncoming(Intent incoming) {
         if (incoming == null) {
-            Log.d(TAG, "Incoming intent is null");
+            Log.i(TAG, "Incoming intent is null");
             return;
         }
 
-        Log.d(TAG, "Incoming action=" + incoming.getAction()
+        Log.i(TAG, "Incoming action=" + incoming.getAction()
                 + " data=" + incoming.getData()
                 + " type=" + incoming.getType()
                 + " categories=" + incoming.getCategories());
 
         Bundle extras = incoming.getExtras();
         if (extras == null || extras.isEmpty()) {
-            Log.d(TAG, "Incoming extras: none");
+            Log.i(TAG, "Incoming extras: none");
             return;
         }
         for (String key : extras.keySet()) {
@@ -87,7 +87,7 @@ public final class ShellActivity extends Activity {
             } catch (RuntimeException e) {
                 value = "<unreadable: " + e + ">";
             }
-            Log.d(TAG, "Incoming extra: " + key + " = " + value);
+            Log.i(TAG, "Incoming extra: " + key + " = " + value);
         }
     }
 
