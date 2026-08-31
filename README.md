@@ -44,6 +44,60 @@ login, tracking, analytics, advertising, or network client.
 - Supports Android 5.0 (API 21) and later. Current TizenTube Cobalt releases may
   require a newer Android version.
 
+## Fire TV / Fire Stick support
+
+The original bridge, built by [TobiPeterG](https://github.com/TobiPeterG), only
+hijacked the Google TV / Android TV YouTube package
+(`com.google.android.youtube.tv`) and works well on those platforms. Amazon
+Fire TV and Fire Stick devices don't run that package at all — Fire OS ships
+its own, separately built YouTube client under a different package,
+`com.amazon.firetv.youtube`. When Alexa resolves a voice command like "open
+YouTube" on Fire OS, it resolves against that Fire OS package name, not the
+Google TV one, so the original bridge was invisible to Fire TV entirely.
+
+**What changed to add Fire TV support:** the bridge is now built as two
+Gradle product flavors from the same codebase and the same `ShellActivity`
+forwarding logic (which was already package-agnostic and needed no rewrite):
+
+- `atv` — unchanged, still `com.google.android.youtube.tv`.
+- `firetv` — new, uses `com.amazon.firetv.youtube` so Fire OS and Alexa treat
+  this bridge as the YouTube app. It also declares the
+  `com.amazon.permission.media.session.voicecommandcontrol` permission, which
+  is what the real Amazon YouTube app uses to hook into Alexa's media/voice
+  control system.
+
+CI now builds and publishes both flavors as separate APKs; install whichever
+matches your device (see [Requirements](#requirements)).
+
+### Why voice search didn't work at first, and how it was fixed
+
+After Fire TV support was added, launching YouTube by voice worked (Alexa
+correctly opened this bridge instead of the missing Amazon YouTube app), but
+saying something like "search cat videos on YouTube" opened Cobalt's home
+screen instead of actually searching.
+
+**Root cause:** Alexa's (and Android TV's) voice-search intents
+(`MEDIA_PLAY_FROM_SEARCH`, `SEARCH`, etc.) carry the spoken query as an Intent
+*extra* (`SearchManager.QUERY`) — they don't include a URI. TizenTube Cobalt
+is built on Google's [Cobalt](https://cobalt.dev) app runtime, and its Android
+glue code (`CobaltActivity`) only ever reads an incoming intent's **data
+URI**; it never looks at extras. So the query was reaching the bridge
+correctly, but had nowhere to go once forwarded — Cobalt silently ignored it
+and just showed its home screen. This was compounded by a
+[known upstream issue in TizenTube Cobalt](https://github.com/reisxd/TizenTubeCobalt/issues/129)
+where its manifest doesn't reliably declare the deep-link `<intent-filter>`
+entries either, so even the original request-forwarding intent could fail to
+resolve and silently fall back to a plain app launch.
+
+**The fix:** `ShellActivity` now converts a voice/text search query into a
+regular YouTube search URL, `https://www.youtube.com/results?search_query=<query>`,
+since that's the only kind of input Cobalt actually understands. It also now
+resolves Cobalt's launcher activity component directly and targets that
+component explicitly, instead of only scoping the intent to Cobalt's package
+name — explicit-component intents bypass Android's intent-filter matching
+entirely, so delivery no longer depends on Cobalt's manifest declaring the
+right filters.
+
 ## What it cannot do
 
 - It cannot coexist with the official YouTube TV app because both use the same
