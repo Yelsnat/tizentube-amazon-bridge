@@ -1,16 +1,29 @@
-# TizenTube Bridge for Android TV
+# TizenTube Bridge for Android TV and Fire TV
 
-TizenTube Bridge is a small Android TV compatibility app that takes the place of
-the official YouTube TV package and forwards YouTube launch requests to
+TizenTube Bridge is a small compatibility app that takes the place of an
+official YouTube TV package and forwards YouTube launch requests to
 [TizenTube Cobalt](https://github.com/reisxd/TizenTubeCobalt).
 
-It is intended for Android TV and Google TV devices such as Chromecast with
-Google TV. The bridge contains no video player, YouTube client, account login,
-tracking, analytics, advertising, or network client.
+It is built as two product flavors from the same source:
+
+- **`atv`** — for Android TV and Google TV devices such as Chromecast with
+  Google TV. Uses the Google TV YouTube package ID,
+  `com.google.android.youtube.tv`.
+- **`firetv`** — for Amazon Fire TV devices. Uses the Fire OS YouTube package
+  ID, `com.amazon.firetv.youtube`, so that Alexa voice commands (e.g. "open
+  YouTube") resolve to this bridge instead of the uninstalled Amazon-catalog
+  YouTube app. It also declares the
+  `com.amazon.permission.media.session.voicecommandcontrol` permission that
+  the real Amazon YouTube app uses to hook into Alexa media/voice control.
+
+Both flavors share the same `ShellActivity` forwarding logic, which is
+package-agnostic. The bridge contains no video player, YouTube client, account
+login, tracking, analytics, advertising, or network client.
 
 ## Features
 
-- Uses YouTube TV's package ID, `com.google.android.youtube.tv`.
+- Uses the target platform's YouTube package ID (`com.google.android.youtube.tv`
+  for Android/Google TV, `com.amazon.firetv.youtube` for Fire TV).
 - Opens TizenTube Cobalt when the YouTube app tile or a dedicated YouTube remote
   button is selected.
 - Forwards YouTube website links and supported YouTube URI schemes.
@@ -100,7 +113,8 @@ This behavior depends on Google's launcher and backend and is not guaranteed.
 
 ## Requirements
 
-- An Android TV or Google TV device.
+- An Android TV, Google TV, or Fire TV device. Install the `atv` flavor APK on
+  Android/Google TV and the `firetv` flavor APK on Fire TV devices.
 - TizenTube Cobalt installed with package ID
   `io.gh.reisxd.tizentube.cobalt`.
 - Permission to uninstall or disable the official YouTube TV package and install
