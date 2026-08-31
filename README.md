@@ -123,6 +123,30 @@ package with the same package ID is still registered on the device. Some
 system images don't allow replacing their built-in YouTube package without
 root access or firmware changes.
 
+### Install via ADB sideload
+
+1. On your computer, download the APK for your platform from the
+   [latest release](https://github.com/Yelsnat/tizentube-amazon-bridge/releases/latest):
+
+   - Android TV / Google TV: `app-atv-debug.apk`
+   - Fire TV / Fire Stick: `app-firetv-debug.apk`
+
+2. Enable ADB debugging on the device (**Settings > My Fire TV/Device >
+   Developer options > ADB debugging**, enabling Developer options first if
+   it's hidden).
+3. Find the device's IP address (**Settings > My Fire TV/Device > About >
+   Network**).
+4. From a terminal with [ADB platform tools](https://developer.android.com/tools/releases/platform-tools)
+   installed:
+
+   ```text
+   adb connect <device-ip>:5555
+   adb install app-firetv-debug.apk
+   ```
+
+   Use `adb install -r <file>` instead to reinstall over an existing install
+   (e.g. when updating).
+
 ## Privacy and security
 
 The bridge does not request internet access and makes no network requests. It
