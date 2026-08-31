@@ -1,234 +1,121 @@
 # TizenTube Bridge for Android TV and Fire TV
 
-TizenTube Bridge is a small compatibility app that takes the place of an
-official YouTube TV package and forwards YouTube launch requests to
-[TizenTube Cobalt](https://github.com/reisxd/TizenTubeCobalt).
+TizenTube Bridge is a small compatibility app that takes the place of the
+official YouTube TV app and forwards YouTube launch requests to
+[TizenTube Cobalt](https://github.com/reisxd/TizenTubeCobalt). It contains no
+video player, YouTube client, account login, tracking, analytics, advertising,
+or network client — it only forwards Android intents.
 
-It is built as two product flavors from the same source:
+It's built as two flavors from the same codebase:
 
-- **`atv`** — for Android TV and Google TV devices such as Chromecast with
-  Google TV. Uses the Google TV YouTube package ID,
+- **`atv`** — for Android TV / Google TV. Uses the package ID
   `com.google.android.youtube.tv`.
-- **`firetv`** — for Amazon Fire TV devices. Uses the Fire OS YouTube package
-  ID, `com.amazon.firetv.youtube`, so that Alexa voice commands (e.g. "open
-  YouTube") resolve to this bridge instead of the uninstalled Amazon-catalog
-  YouTube app. It also declares the
-  `com.amazon.permission.media.session.voicecommandcontrol` permission that
-  the real Amazon YouTube app uses to hook into Alexa media/voice control.
-
-Both flavors share the same `ShellActivity` forwarding logic, which is
-package-agnostic. The bridge contains no video player, YouTube client, account
-login, tracking, analytics, advertising, or network client.
+- **`firetv`** — for Amazon Fire TV / Fire Stick. Uses the package ID
+  `com.amazon.firetv.youtube`.
 
 ## Features
 
-- Uses the target platform's YouTube package ID (`com.google.android.youtube.tv`
-  for Android/Google TV, `com.amazon.firetv.youtube` for Fire TV).
-- Opens TizenTube Cobalt when the YouTube app tile or a dedicated YouTube remote
-  button is selected.
-- Forwards YouTube website links and supported YouTube URI schemes.
-- Forwards video requests originating from Google TV home-screen cards when the
-  launcher targets the YouTube package.
-- Accepts common Android TV media, search, voice-command, and Google search
-  intents, including Alexa voice search on Fire TV, and converts their search
-  query into a YouTube search URL that Cobalt understands.
-- Preserves URI permission flags, MIME type, clip data, and extras where
-  possible.
-- Delivers intents directly to Cobalt's resolved Leanback/main activity
-  component, so forwarding does not depend on Cobalt's own manifest
-  declaring matching intent-filters.
-- Shows an English error message if Cobalt is missing or cannot be opened.
-- Keeps regular user-facing bridge labels transparent by referring to YouTube.
-  Error messages name TizenTube Cobalt so missing dependencies can be diagnosed
-  and installed.
-- Supports Android 5.0 (API 21) and later. Current TizenTube Cobalt releases may
-  require a newer Android version.
+- Opens TizenTube Cobalt when the YouTube tile, a remote's YouTube button, a
+  YouTube link, or a voice command (including Alexa on Fire TV) is used.
+- Forwards YouTube website links and `youtube:`/`vnd.youtube:` URI schemes.
+- Converts voice/text search queries into a YouTube search URL, since Cobalt
+  only understands URIs, not raw search extras.
+- Delivers intents directly to Cobalt's resolved launcher component, which
+  doesn't depend on Cobalt's own manifest declaring matching intent-filters.
+- Shows a Toast naming TizenTube Cobalt if it's missing or can't be opened.
+- Supports Android 5.0 (API 21) and later.
 
 ## Fire TV / Fire Stick support
 
 The original bridge, built by [TobiPeterG](https://github.com/TobiPeterG), only
-hijacked the Google TV / Android TV YouTube package
-(`com.google.android.youtube.tv`) and works well on those platforms. Amazon
-Fire TV and Fire Stick devices don't run that package at all — Fire OS ships
-its own, separately built YouTube client under a different package,
-`com.amazon.firetv.youtube`. When Alexa resolves a voice command like "open
-YouTube" on Fire OS, it resolves against that Fire OS package name, not the
-Google TV one, so the original bridge was invisible to Fire TV entirely.
+hijacks the Google TV YouTube package. Fire OS ships a separate YouTube app
+under a different package (`com.amazon.firetv.youtube`), so Alexa's "open
+YouTube" resolved to that missing app instead of the bridge.
 
-**What changed to add Fire TV support:** the bridge is now built as two
-Gradle product flavors from the same codebase and the same `ShellActivity`
-forwarding logic (which was already package-agnostic and needed no rewrite):
+Fire TV support adds a second `firetv` product flavor that hijacks that
+package instead, plus the `com.amazon.permission.media.session.voicecommandcontrol`
+permission the real Amazon YouTube app uses for Alexa media/voice control.
+Both flavors share the same `ShellActivity` forwarding logic unchanged.
 
-- `atv` — unchanged, still `com.google.android.youtube.tv`.
-- `firetv` — new, uses `com.amazon.firetv.youtube` so Fire OS and Alexa treat
-  this bridge as the YouTube app. It also declares the
-  `com.amazon.permission.media.session.voicecommandcontrol` permission, which
-  is what the real Amazon YouTube app uses to hook into Alexa's media/voice
-  control system.
-
-CI now builds and publishes both flavors as separate APKs; install whichever
-matches your device (see [Requirements](#requirements)).
-
-### Why voice search didn't work at first, and how it was fixed
-
-After Fire TV support was added, launching YouTube by voice worked (Alexa
-correctly opened this bridge instead of the missing Amazon YouTube app), but
-saying something like "search cat videos on YouTube" opened Cobalt's home
-screen instead of actually searching.
-
-**Root cause:** Alexa's (and Android TV's) voice-search intents
-(`MEDIA_PLAY_FROM_SEARCH`, `SEARCH`, etc.) carry the spoken query as an Intent
-*extra* (`SearchManager.QUERY`) — they don't include a URI. TizenTube Cobalt
-is built on Google's [Cobalt](https://cobalt.dev) app runtime, and its Android
-glue code (`CobaltActivity`) only ever reads an incoming intent's **data
-URI**; it never looks at extras. So the query was reaching the bridge
-correctly, but had nowhere to go once forwarded — Cobalt silently ignored it
-and just showed its home screen. This was compounded by a
-[known upstream issue in TizenTube Cobalt](https://github.com/reisxd/TizenTubeCobalt/issues/129)
-where its manifest doesn't reliably declare the deep-link `<intent-filter>`
-entries either, so even the original request-forwarding intent could fail to
-resolve and silently fall back to a plain app launch.
-
-**The fix:** `ShellActivity` now converts a voice/text search query into a
-regular YouTube search URL, `https://www.youtube.com/results?search_query=<query>`,
-since that's the only kind of input Cobalt actually understands. It also now
-resolves Cobalt's launcher activity component directly and targets that
-component explicitly, instead of only scoping the intent to Cobalt's package
-name — explicit-component intents bypass Android's intent-filter matching
-entirely, so delivery no longer depends on Cobalt's manifest declaring the
-right filters.
+**Voice search initially didn't work** because Alexa's (and Android TV's)
+voice-search intents carry the spoken query as an Intent extra
+(`SearchManager.QUERY`), not a URI. Cobalt's Android glue code
+(`CobaltActivity`, from the [Cobalt](https://cobalt.dev) runtime it's built
+on) only ever reads an intent's data URI and ignores extras entirely, so the
+query was silently dropped and Cobalt just opened its home screen. This is
+fixed by converting the query into a `youtube.com/results?search_query=`
+URL before forwarding, and by targeting Cobalt's launcher component directly
+(bypassing intent-filter matching) to work around a
+[known Cobalt manifest bug](https://github.com/reisxd/TizenTubeCobalt/issues/129).
 
 ## What it cannot do
 
-- It cannot coexist with the official YouTube TV app because both use the same
-  package ID.
-- It does not modify, patch, bundle, or install TizenTube Cobalt.
-- It cannot make Cobalt support a deep link that Cobalt itself does not
-  understand. In that case it can only open Cobalt's home screen.
-- It does not provide a local search-result database and does not fetch videos,
-  channels, titles, or thumbnails. Google TV may independently show server-side
-  YouTube results and send their playback intents to the YouTube package. The
-  bridge can forward those intents but cannot control which results Google
-  displays.
-- It does not create or refresh Android TV home-screen recommendation channels,
-  personalized feeds, or **Watch Next** entries.
-- It cannot read Cobalt's signed-in session, history, subscriptions,
-  recommendations, or playback state. Android isolates the two apps.
-- It cannot restore recommendations removed together with the official YouTube
-  app. It only forwards cards that already target the YouTube package.
-- It does not provide casting, DIAL, notifications, background playback, or an
-  update service.
-- It cannot bypass device policies, package-signature checks, or restrictions
-  imposed by Google TV, the launcher, or the firmware.
-
-## Comparison with SmartTube's ATV Bridge
-
-This comparison is based on static inspection of the official
-`ATV_SYTV_Bridge.apk` version 3.4 (version code 44), downloaded from SmartTube's
-official GitHub release URL.
-
-| Capability | TizenTube Bridge | SmartTube ATV Bridge 3.4 |
-| --- | --- | --- |
-| Uses `com.google.android.youtube.tv` | Yes | Yes |
-| Launcher and Leanback launcher entry | Yes | Yes |
-| Opens from a YouTube remote button | Yes | Yes |
-| Forwards HTTP(S) YouTube links | Yes | Yes |
-| Forwards `youtube://` requests | Yes | Yes, for `search` and `play` hosts |
-| Forwards `vnd.youtube:` requests | Yes | Not declared in its manifest |
-| Handles `MEDIA_PLAY_FROM_SEARCH` | Yes, including requests without a URI | Declared together with its URI-constrained filter |
-| Handles additional generic search/voice actions | Yes | Not declared in its manifest |
-| Local global-search content provider | No | No provider declared |
-| Android TV recommendation-channel provider | No | No provider declared |
-| Creates new personalized home recommendations | No | No |
-| Forwards existing home-card intents | Yes | Yes, when addressed to YouTube |
-| Copies incoming intent data and extras | Yes | Yes |
-| Fallback to target app's launcher activity | Yes | No; it tries fixed SmartTube activities |
-| Target applications | TizenTube Cobalt | SmartTube stable, beta, F-Droid, and two legacy packages |
-| Missing-target feedback | Toast | Full-screen error view |
-| Target-specific bridge extras | No | Yes: `hide_tips` and `bridge_package_name` |
-| Minimum Android version | Android 5.0 / API 21 | Android 4.2 / API 17 |
-
+- Cannot coexist with the official YouTube TV app (same package ID).
+- Does not modify, patch, bundle, or install TizenTube Cobalt.
+- Cannot make Cobalt support a deep link it doesn't understand — it can only
+  open Cobalt's home screen in that case.
+- Does not fetch videos, channels, titles, or thumbnails, or provide search
+  results itself; it only forwards intents it's given.
+- Cannot read Cobalt's signed-in session, history, or recommendations —
+  Android isolates the two apps.
+- Does not provide casting, DIAL, notifications, or background playback.
 
 ## How it works
 
-1. Android sees this app as `com.google.android.youtube.tv` (or
-   `com.amazon.firetv.youtube` on Fire TV).
-2. A launcher, remote button, voice action, recommendation card, or another app
-   sends an intent to the YouTube package.
-3. `ShellActivity` resolves Cobalt's own Leanback/main launcher activity
-   component (`io.gh.reisxd.tizentube.cobalt`) and forwards the intent
-   directly to that component, rather than only scoping the intent to
-   Cobalt's package. This is deliberate: Cobalt is a
-   [Cobalt](https://cobalt.dev)-based app whose Android glue code
-   (`CobaltActivity`) only ever reads the forwarded intent's **data URI** —
-   it ignores extras entirely — and, separately, targeting an explicit
-   component bypasses any gaps in Cobalt's own manifest `<intent-filter>`
-   declarations.
-4. If the incoming intent already carries a URI (a YouTube link, `youtube:`/
-   `vnd.youtube:` scheme, etc.), that URI is forwarded as-is.
-5. If the incoming intent instead carries a search query extra (e.g. Alexa's
-   or Android TV's `MEDIA_PLAY_FROM_SEARCH`/`SEARCH` voice intents, which have
-   no URI), the bridge builds a
-   `https://www.youtube.com/results?search_query=<query>` URL from the query
-   and forwards that instead, since Cobalt cannot read the raw query extra.
-6. The original extras, clip data, MIME type, and relevant flags are still
-   copied alongside the URI for forward compatibility.
-
-On supported Google TV launchers, Google may supply concrete YouTube search
-results from its own servers because the YouTube package ID is installed. Those
-results are not generated by this bridge. When a selected result targets
-`com.google.android.youtube.tv`, the normal forwarding flow opens it in Cobalt.
-This behavior depends on Google's launcher and backend and is not guaranteed.
+1. Android sees this app as the YouTube package for its platform
+   (`com.google.android.youtube.tv` or `com.amazon.firetv.youtube`).
+2. A launcher, remote button, voice action, or another app sends an intent to
+   that package.
+3. `ShellActivity` resolves Cobalt's launcher activity component and forwards
+   the intent to it directly.
+4. If the intent already carries a URI, that URI is forwarded as-is. If it
+   instead carries a search query extra, the bridge builds a YouTube search
+   URL from it.
+5. Extras, clip data, MIME type, and relevant flags are copied alongside the
+   URI for compatibility with anything Cobalt may read.
 
 ## Requirements
 
-- An Android TV, Google TV, or Fire TV device. Install the `atv` flavor APK on
-  Android/Google TV and the `firetv` flavor APK on Fire TV devices.
-- TizenTube Cobalt installed with package ID
-  `io.gh.reisxd.tizentube.cobalt`.
-- Permission to uninstall or disable the official YouTube TV package and install
-  APKs from outside Google Play.
-- ADB, Downloader, or another trusted sideloading method.
+- An Android TV, Google TV, or Fire TV device. Install the `atv` flavor on
+  Android/Google TV and the `firetv` flavor on Fire TV.
+- TizenTube Cobalt installed with package ID `io.gh.reisxd.tizentube.cobalt`.
+- Permission to uninstall/disable the official YouTube TV app and sideload
+  APKs.
 
 ## Installation
 
 Install TizenTube Cobalt first and verify that it opens normally.
 
 The official YouTube TV app and this bridge cannot be installed together. On
-devices where YouTube is uninstallable, uninstall it. If YouTube cannot be uninstalled then this app is not compatible with your device.
+devices where YouTube is uninstallable, uninstall it. If YouTube cannot be
+uninstalled, this app is not compatible with your device.
 
 ### Install with Downloader by AFTVnews
 
-1. Install **Downloader by AFTVnews** from the Google Play Store on your Android
-   TV or Google TV device.
-2. Allow Downloader to install unknown apps when Android asks. This setting is
-   usually located under **Settings > Apps > Special app access > Install
-   unknown apps > Downloader**.
-3. Open Downloader and enter this numeric code:
+1. Install **Downloader by AFTVnews** from the Google Play Store.
+2. Allow Downloader to install unknown apps (**Settings > Apps > Special app
+   access > Install unknown apps > Downloader**).
+3. Open Downloader and enter this code:
 
    ```text
    8792210
    ```
 
-4. Select **Go**, wait for `tizentube-bridge.apk` to download, and select
-   **Install**.
-5. After installation, you may delete the downloaded APK from Downloader.
+4. Select **Go**, wait for the APK to download, then select **Install**.
 
-To update the bridge, enter the same Downloader code again and install the new
-APK over the existing app. Do not uninstall the bridge before a normal update.
+To update, enter the same code again and install over the existing app. Don't
+uninstall the bridge before an update.
 
 If Android reports `INSTALL_FAILED_UPDATE_INCOMPATIBLE`, a differently signed
-package with the YouTube package ID is still registered on the device. Some
-system images do not allow replacing their built-in YouTube package without
+package with the same package ID is still registered on the device. Some
+system images don't allow replacing their built-in YouTube package without
 root access or firmware changes.
-
 
 ## Privacy and security
 
-The bridge does not request internet access and does not make network requests.
-It only receives Android intents and starts TizenTube Cobalt. Incoming intent
-data and search extras are passed to Cobalt; handling them is then Cobalt's
-responsibility.
+The bridge does not request internet access and makes no network requests. It
+only receives Android intents and starts TizenTube Cobalt; handling that data
+is then Cobalt's responsibility.
 
 Only install APKs from releases you trust.
 
