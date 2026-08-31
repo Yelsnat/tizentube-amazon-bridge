@@ -114,25 +114,61 @@ public final class ShellActivity extends Activity {
     }
 
     /**
-     * Returns the URI to forward to Cobalt: the incoming intent's own data if
-     * present, otherwise a YouTube search results URL built from a voice/text
-     * search query extra (e.g. from MEDIA_PLAY_FROM_SEARCH or SEARCH intents).
+     * Returns the URI to forward to Cobalt: a translated YouTube search URL
+     * if the incoming intent's data or extras carry a search query, or the
+     * incoming intent's own data otherwise.
      */
     private Uri resolveData(Intent incoming) {
         if (incoming == null) {
             return null;
         }
 
-        if (incoming.getData() != null) {
-            return incoming.getData();
+        Uri data = incoming.getData();
+        if (data != null) {
+            Uri searchUrl = searchUrlFromCustomSchemeUri(data);
+            return searchUrl != null ? searchUrl : data;
         }
 
-        String query = incoming.getStringExtra(SearchManager.QUERY);
-        if (query != null && !query.trim().isEmpty()) {
-            return Uri.parse(YOUTUBE_SEARCH_URL + Uri.encode(query));
-        }
+        return buildSearchUrl(incoming.getStringExtra(SearchManager.QUERY));
+    }
 
-        return null;
+    /**
+     * Cobalt navigates directly to the forwarded intent's data as if it were
+     * a literal web page address; it cannot load custom, non-http(s) schemes.
+     * Alexa's Fire TV voice search sends exactly such a URI, e.g.
+     * "youtube://search?query=cat+videos&isVoice=true", which Cobalt's
+     * browser silently fails to load and falls back to its default page. If
+     * the data URI carries a search query this way, translate it into a real
+     * https://www.youtube.com search URL instead.
+     */
+    private Uri searchUrlFromCustomSchemeUri(Uri data) {
+        String scheme = data.getScheme();
+        if ("http".equals(scheme) || "https".equals(scheme)) {
+            return null;
+        }
+        if (!"youtube".equals(scheme) && !"vnd.youtube".equals(scheme)
+                && !"vnd.youtube.launch".equals(scheme)) {
+            return null;
+        }
+        return buildSearchUrl(data.getQueryParameter("query"));
+    }
+
+    /**
+     * Builds a YouTube search results URL from a raw query string. Android's
+     * Uri does not translate '+' to a space when decoding query parameters
+     * (that's an application/x-www-form-urlencoded convention, not part of
+     * the URI spec), so a literal '+' from Alexa's query extra/URI is treated
+     * as a word separator here before re-encoding.
+     */
+    private Uri buildSearchUrl(String query) {
+        if (query == null) {
+            return null;
+        }
+        query = query.replace('+', ' ').trim();
+        if (query.isEmpty()) {
+            return null;
+        }
+        return Uri.parse(YOUTUBE_SEARCH_URL + Uri.encode(query));
     }
 
     private void copyPayload(Intent source, Intent target) {
